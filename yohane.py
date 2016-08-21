@@ -9,9 +9,9 @@ import requests
 import re
 from optparse import OptionParser
 
-#python3 yohane.py -y 2016 -c 2
-#python3 yohane.py -y 2016 -c 2 -d
-#python3 yohane.py -y 2016 -c 2 -d -s 5
+#python3 yohane.py -i 372
+#python3 yohane.py -i 372 -d
+#python3 yohane.py -i 372 -d -s 5
 parser = OptionParser()
 
 parser.add_option(
@@ -22,17 +22,10 @@ parser.add_option(
 )
 
 parser.add_option(
-    '-y', '--year',
+    '-i', '--id',
     action = 'store',
     type = 'str',
-    dest = 'year',
-)
-
-parser.add_option(
-    '-c', '--cours',
-    action = 'store',
-    type = 'str',
-    dest = 'cours',
+    dest = 'bases_id',
 )
 
 parser.add_option(
@@ -43,8 +36,7 @@ parser.add_option(
 )
 
 parser.set_defaults(
-    year = 2016,
-    cours_id = 1,
+    bases_id = 0,
     day_switch = False,
     sleep_sec = 30
 )
@@ -52,8 +44,7 @@ parser.set_defaults(
 options, args = parser.parse_args()
 
 day_switch = options.day_switch
-year = options.year
-cours = options.cours
+bases_id = options.bases_id
 sleep_sec = options.sleep_sec
 
 def status_table_init(master_ids):
@@ -67,7 +58,7 @@ def status_table_init(master_ids):
     try:
         with connection.cursor() as cursor:
             # Create a new record
-            sql = "delete FROM pixiv_tag_status WHERE bases_id IN (" + ",".join(master_ids) + ")"
+            sql = "delete FROM pixiv_character_tag_status WHERE bases_id IN (" + ",".join(master_ids) + ")"
             cursor.execute(sql)
 
         connection.commit()
@@ -76,22 +67,7 @@ def status_table_init(master_ids):
     finally:
         connection.close()
 
-# スペースが入っていたら()で囲む、全角+は半角に
-def trim_keyword(keyword):
-    #(第二期)などを消去
-    if re.search("\(", keyword) != None:
-        keyword =re.sub(r'(\(.*\))', "", keyword)
-    # 機動戦士ガンダム サンダーボルトなど
-    if re.search("\s" , keyword) != None:
-        keyword = re.sub(r'(.*)', "(" + r"\1" + ")", keyword)
-    # ノルン＋ノネットのため
-    if re.search("＋" , keyword) != None:
-        keyword = keyword.replace('＋', '+')
-
-    return keyword
-
-
-def regist_pixiv_datta(id, get_date, key, total, note, json, history_table):
+def regist_pixiv_datta(id, character_id, get_date, key, total, note, json, history_table):
     connection = pymysql.connect(host='localhost',
                                  user='root',
                                  password='',
@@ -101,13 +77,13 @@ def regist_pixiv_datta(id, get_date, key, total, note, json, history_table):
 
     try:
         with connection.cursor() as cursor:
-            sql = "INSERT INTO `pixiv_tag_status` (`bases_id`, `get_date`, `search_word`, `total`,`note`, `json`, `created_at`, `updated_at`) " \
-                  "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(sql, (id, get_date, key, total, note, json, datetime.now(), datetime.now()))
+            sql = "INSERT INTO `pixiv_character_tag_status` (`bases_id`, `character_id`, `get_date`, `search_word`, `total`,`note`, `json`, `created_at`, `updated_at`) " \
+                  "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql, (id, character_id, get_date, key, total, note, json, datetime.now(), datetime.now()))
 
-            sql = "INSERT INTO " + history_table + " (`bases_id`, `get_date`, `search_word`, `total`,`note`, `json`, `created_at`, `updated_at`) " \
-                  "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(sql, (id, get_date, key, total, note, json, datetime.now(), datetime.now()))
+            sql = "INSERT INTO " + history_table + " (`bases_id`,`character_id`, `get_date`, `search_word`, `total`,`note`, `json`, `created_at`, `updated_at`) " \
+                  "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql, (id, character_id, get_date, key, total, note, json, datetime.now(), datetime.now()))
 
             connection.commit()
 
@@ -116,42 +92,46 @@ def regist_pixiv_datta(id, get_date, key, total, note, json, history_table):
 
 
 SLEEP_TIME_SEC = sleep_sec
-history_table = "pixiv_tag_hourly"
+history_table = "pixiv_character_tag_hourly"
 get_date = datetime.now()
 param = sys.argv
 
+
+status_table_init([bases_id])
+
 if (day_switch):
-    history_table = "pixiv_tag_daily"
+    history_table = "pixiv_character_tag_daily"
     get_date = date.today()
 
-print(history_table)
 
-url = 'http://api.moemoe.tokyo/anime/v1/master/' + year + '/' + cours
-result = requests.get(url)
+character_list = []
 
-master_list = json.loads(result.text)
-master_ids = []
-for master in master_list:
-    master_ids.append(str(master['id']))
-status_table_init(master_ids)
+connection = pymysql.connect(host='localhost',
+                             user='root',
+                             password='',
+                             db='anime_admin_development',
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor)
 
-for master in master_list:
+with connection.cursor() as cursor:
+    sql = "SELECT id, bases_id, name FROM anime_character where bases_id = " + bases_id
+    cursor.execute(sql)
 
-    titles = trim_keyword(master['title'])
-    if len(master['title_short1']) > 0 and titles != trim_keyword(master['title_short1']):
-        titles += ' or ' + trim_keyword(master['title_short1'])
-    if len(master['title_short2']) > 0:
-        titles += ' or ' + trim_keyword(master['title_short2'])
-    if len(master['title_short3']) > 0:
-        titles += ' or ' + trim_keyword(master['title_short3'])
+    results = cursor.fetchall()
+    for r in results:
+        character_list.append(r)
 
-    print(titles)
-#    continue
-    json_result = pixiv.api.search_works(titles, page=1, mode='tag')
+for character in character_list:
+
+    search_keyword = character['name']
+
+    json_result = pixiv.api.search_works(search_keyword, page=1, mode='tag')
     total = json_result.pagination.total
+
+    print(search_keyword)
     print(total)
 
-    regist_pixiv_datta(master['id'], get_date, titles, total, '', '', history_table)
+    regist_pixiv_datta(character['bases_id'], character['id'], get_date, search_keyword, total, '', '', history_table)
 
     print("sleep!")
     time.sleep(SLEEP_TIME_SEC)

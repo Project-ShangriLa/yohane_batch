@@ -1,4 +1,4 @@
-CREATE TABLE `character` (
+CREATE TABLE `anime_character` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `bases_id` int(11) DEFAULT NULL,
   `name` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
