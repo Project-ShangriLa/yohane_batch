@@ -1,4 +1,4 @@
 #!/bin/sh
-export ALICE_BATCH=`pwd`
-echo "export ALICE_BATCH=$ALICE_BATCH" >> ~/.bashrc
+export YOHANE_BATCH=`pwd`
+echo "export YOHANE_BATCH=$YOHANE_BATCH" >> ~/.bashrc
 echo "set OK! (^o^)"

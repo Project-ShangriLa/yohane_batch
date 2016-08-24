@@ -19,11 +19,11 @@
 
 # Learn more: http://github.com/javan/whenever
 set :output, "/var/log/cron.log"
-every 2.hour do
-  command "source .bashrc;cd $ALICE_BATCH;python3 alice.py"
+every 6.hour do
+  command "source .bashrc;cd $YOHANE_BATCH;python3 yohane.py -i 372"
 end
 
-every :day, :at => '01:00am' do
-  command "source .bashrc;cd $ALICE_BATCH;python3 alice.py -d"
+every :day, :at => '00:20am' do
+  command "source .bashrc;cd $YOHANE_BATCH;python3 yohane.py -i 372 -d"
 end
 
